@@ -155,13 +155,13 @@ class CmakeGenerator:
 class PybindCppGenerator:
     @staticmethod
     def generate_cpp_code(
+        python_file_path_with_extension: str,
         module_name: str,
         cpp_file_path_to_generate: str
     ):
         """
         Generate a C++ file that defines a pybind11 module with an initialize function.
         """
-
         code_text = ""
         code_text += "#include <pybind11/numpy.h>\n"
         code_text += "#include <pybind11/pybind11.h>\n\n"
@@ -183,18 +183,18 @@ class PybindCppGenerator:
 class SIL_Operator:
     def __init__(
         self,
-        python_file_name_to_generate: str,
+        target_python_file_name: str,
         SIL_folder: str
     ):
-        if python_file_name_to_generate.endswith(".py"):
-            python_file_name_to_generate = python_file_name_to_generate[:-3]
+        if target_python_file_name.endswith(".py"):
+            target_python_file_name = target_python_file_name[:-3]
         else:
             raise ValueError(
-                "The python_file_name_to_generate should end with .py")
+                "The target_python_file_name should end with .py")
 
-        self.python_file_name_to_generate = python_file_name_to_generate
+        self.target_python_file_name = target_python_file_name
         self.module_file_name = snake_to_camel(
-            self.python_file_name_to_generate) + "SIL"
+            self.target_python_file_name) + "SIL"
 
         self.SIL_folder = SIL_folder
 
@@ -204,6 +204,8 @@ class SIL_Operator:
         dir_path = os.path.dirname(self.this_file_path)
 
         self.root_path = os.path.abspath(os.path.join(dir_path, "../../"))
+
+        self.cpp_file_path_to_generate = ""
 
     @staticmethod
     def find_file_path(
@@ -219,6 +221,21 @@ class SIL_Operator:
                 return os.path.join(dirpath, file_name)
 
         raise FileNotFoundError(f"{file_name} not found in {root_path}")
+
+    def find_c_make_lists_txt(self) -> str:
+        """
+        Recursively search for a CMakeLists.txt file in the current directory and return its full path.
+        Raises FileNotFoundError if the file is not found.
+        """
+
+        current_dir = os.path.dirname(os.path.abspath(__file__))
+
+        for dirpath, dirnames, filenames in os.walk(current_dir):
+            if "CMakeLists.txt" in filenames:
+                return os.path.join(dirpath, "CMakeLists.txt")
+
+        raise FileNotFoundError(
+            f"CMakeLists.txt not found. Delete {self.cpp_file_path_to_generate} and try again.")
 
     def build_pybind11_code(self):
         """
@@ -243,24 +260,29 @@ class SIL_Operator:
         """
         Generate and build the SIL code for the given Python file.
         """
+        python_file_name = self.target_python_file_name + ".py"
 
-        python_file_name = self.python_file_name_to_generate + ".py"
-        python_file_path = SIL_Operator.find_file_path(
-            python_file_name, self.root_path).split(".py")[0]
+        python_file_path_with_extension = SIL_Operator.find_file_path(
+            python_file_name, self.root_path)
+        python_file_path = python_file_path_with_extension.split('.py')[0]
 
-        cpp_file_path_to_generate = python_file_path + ".cpp"
+        self.cpp_file_path_to_generate = python_file_path + ".cpp"
 
-        if not os.path.exists(cpp_file_path_to_generate):
+        if not os.path.exists(self.cpp_file_path_to_generate):
 
             PybindCppGenerator.generate_cpp_code(
-                self.module_file_name, cpp_file_path_to_generate)
+                python_file_path_with_extension,
+                self.module_file_name,
+                self.cpp_file_path_to_generate)
 
             cmake_generator = CmakeGenerator(
-                self.python_file_name_to_generate,
+                self.target_python_file_name,
                 os.path.dirname(python_file_path),
                 self.module_file_name,
                 self.SIL_folder,
                 self.root_path)
             cmake_generator.generate_cmake_lists_txt()
+        else:
+            self.find_c_make_lists_txt()
 
         self.build_pybind11_code()
