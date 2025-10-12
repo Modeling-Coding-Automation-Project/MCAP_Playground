@@ -19,6 +19,28 @@ class CmakeGenerator:
         self.root_path = root_path
 
     @staticmethod
+    def check_path_is_sample(path: str) -> str:
+
+        path_folders = path.split('/')
+        external_libraries_flag = False
+        helper_file_flag = False
+
+        for i, folder in enumerate(path_folders):
+            if folder.lower() == "external_libraries":
+                external_libraries_flag = True
+
+            if (external_libraries_flag) and \
+                ((folder.lower() == "sample") or
+                 (folder.lower() == "test_sil") or
+                    (folder.lower() == "test_vs")):
+                helper_file_flag = True
+
+        if external_libraries_flag and helper_file_flag:
+            return ""
+        else:
+            return path
+
+    @staticmethod
     def discover_source_include_dirs(root_path: str, src_exts: set = None) -> list:
         """Discover directories under root_path that contain source files.
 
@@ -48,7 +70,10 @@ class CmakeGenerator:
                     rel = rel.replace('\\', '/')
                     if rel == '.':
                         rel = ''
-                    if rel not in seen:
+
+                    rel = CmakeGenerator.check_path_is_sample(rel)
+
+                    if (rel not in seen) and (rel != ""):
                         seen.add(rel)
                         include_dirs.append(rel)
                     break
@@ -77,7 +102,7 @@ class CmakeGenerator:
         code_text += f"target_compile_options({SIL_lib_file_name} PRIVATE -Werror)\n\n"
 
         code_text += f"target_include_directories({SIL_lib_file_name} PRIVATE\n)\n\n"
-        # Discover include directories containing source files under root_path
+
         include_dirs = CmakeGenerator.discover_source_include_dirs(
             self.root_path)
 
