@@ -11,6 +11,7 @@ class CmakeGenerator:
     def __init__(
         self,
         original_python_file_name: str,
+        python_file_dir: str,
         pybind11_module_name: str,
         SIL_folder: str,
         root_path: str
@@ -21,6 +22,7 @@ class CmakeGenerator:
         self.folder_name = os.path.basename(os.path.normpath(self.SIL_folder))
 
         self.root_path = root_path
+        self.python_file_dir = python_file_dir
 
     @staticmethod
     def check_path_is_sample(path: str) -> str:
@@ -101,7 +103,7 @@ class CmakeGenerator:
         code_text += "find_package(pybind11 REQUIRED)\n\n"
 
         code_text += f"pybind11_add_module({self.pybind11_module_name} " + \
-            f"{self.original_python_file_name}.cpp)\n\n"
+            f"{self.python_file_dir}/{self.original_python_file_name}.cpp)\n\n"
 
         code_text += f"target_compile_options({self.pybind11_module_name} PRIVATE -Werror)\n\n"
 
@@ -199,9 +201,9 @@ class SIL_Operator:
 
         python_file_name = self.python_file_name_to_generate + ".py"
         python_file_path = SIL_Operator.find_file_path(
-            python_file_name, self.root_path)
+            python_file_name, self.root_path).split(".py")[0]
 
-        cpp_file_path_to_generate = python_file_path.split(".py")[0] + ".cpp"
+        cpp_file_path_to_generate = python_file_path + ".cpp"
 
         if not os.path.exists(cpp_file_path_to_generate):
 
@@ -210,8 +212,10 @@ class SIL_Operator:
 
             cmake_generator = CmakeGenerator(
                 self.python_file_name_to_generate,
+                os.path.dirname(python_file_path),
                 self.module_file_name,
-                self.SIL_folder, self.root_path)
+                self.SIL_folder,
+                self.root_path)
             cmake_generator.generate_cmake_lists_txt()
 
         self.build_pybind11_code()
