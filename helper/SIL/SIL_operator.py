@@ -13,10 +13,14 @@ from helper.SIL.SIL_operator import SIL_Operator
 current_dir = os.path.dirname(__file__)
 generator = SIL_Operator("my_func.py", current_dir)
 generator.build_SIL_code()
+
+import MyFuncSIL
+MyFuncSIL.initialize()
 ```
 """
 import os
 import subprocess
+import ast
 
 
 def snake_to_camel(snake_str: str) -> str:
@@ -152,15 +156,100 @@ class CmakeGenerator:
             f.write(code_text)
 
 
+class PythonAnalyzer:
+    """
+    Analyze a Python source file and extract class definitions and their methods.
+
+    Usage:
+        classes = PythonAnalyzer.parse_file('/path/to/file.py')
+        # classes -> dict where keys are class names and values are lists of method info dicts
+
+    Each method info dict contains:
+        - name: method name
+        - lineno: line number where the method is defined
+        - decorators: list of decorator names (as strings)
+    """
+    @staticmethod
+    def _get_decorator_name(decorator_node):
+        # Try to recover a readable decorator name from AST node
+        if isinstance(decorator_node, ast.Name):
+            return decorator_node.id
+        elif isinstance(decorator_node, ast.Attribute):
+            parts = []
+            node = decorator_node
+            while isinstance(node, ast.Attribute):
+                parts.append(node.attr)
+                node = node.value
+            if isinstance(node, ast.Name):
+                parts.append(node.id)
+            return ".".join(reversed(parts))
+        elif isinstance(decorator_node, ast.Call):
+            # decorator with arguments, get the function part
+            return PythonAnalyzer._get_decorator_name(decorator_node.func)
+        else:
+            return ast.dump(decorator_node)
+
+    @staticmethod
+    def parse_source(source: str) -> dict:
+        """
+        Parse source text and return a mapping of class names to a list of methods.
+        """
+        tree = ast.parse(source)
+
+        classes = {}
+
+        for node in tree.body:
+            if isinstance(node, ast.ClassDef):
+                class_name = node.name
+                methods = []
+                for item in node.body:
+                    if isinstance(item, ast.FunctionDef):
+                        decorators = [PythonAnalyzer._get_decorator_name(
+                            d) for d in item.decorator_list]
+                        methods.append({
+                            'name': item.name,
+                            'lineno': getattr(item, 'lineno', None),
+                            'decorators': decorators,
+                        })
+                classes[class_name] = methods
+
+        return classes
+
+    @staticmethod
+    def parse_file(path: str) -> dict:
+        """
+        Read a Python file from given path and parse it for classes and methods.
+        Raises FileNotFoundError if the file doesn't exist, and SyntaxError for invalid Python.
+        """
+        if not os.path.exists(path):
+            raise FileNotFoundError(f"{path} not found")
+
+        with open(path, 'r', encoding='utf-8') as f:
+            src = f.read()
+
+        return PythonAnalyzer.parse_source(src)
+
+
 class PybindCppGenerator:
     @staticmethod
     def generate_cpp_code(
+        python_file_path_with_extension: str,
         module_name: str,
         cpp_file_path_to_generate: str
     ):
         """
         Generate a C++ file that defines a pybind11 module with an initialize function.
         """
+
+        # analyze the python file to find classes and methods
+        classes = PythonAnalyzer.parse_file(python_file_path_with_extension)
+
+        if not classes:
+            raise ValueError(
+                f"No classes found in {python_file_path_with_extension}. Cannot generate SIL code.")
+        if len(classes) > 1:
+            raise ValueError(
+                f"Multiple classes found in {python_file_path_with_extension}. Only one class is supported.")
 
         code_text = ""
         code_text += "#include <pybind11/numpy.h>\n"
@@ -170,9 +259,27 @@ class PybindCppGenerator:
 
         code_text += "void initialize(void) {}\n\n"
 
+        method_names = set()
+        for class_name, methods in classes.items():
+            code_text += f"// Class: {class_name}\n"
+            for method in methods:
+                method_name = method['name']
+
+                if method_name.startswith("__") and method_name.endswith("__"):
+                    # Skip dunder methods
+                    continue
+
+                code_text += f"// Method: {method_name}\n"
+                code_text += f"void {method_name}(void) {{}}\n\n"
+
+                method_names.add(method_name)
+
         code_text += f"PYBIND11_MODULE({module_name}, m) {{\n"
 
         code_text += "    m.def(\"initialize\", &initialize, \"Initialize the module\");\n"
+
+        for method_name in method_names:
+            code_text += f"    m.def(\"{method_name}\", &{method_name}, \"{method_name} method\");\n"
 
         code_text += "}\n"
 
@@ -183,18 +290,18 @@ class PybindCppGenerator:
 class SIL_Operator:
     def __init__(
         self,
-        python_file_name_to_generate: str,
+        target_python_file_name: str,
         SIL_folder: str
     ):
-        if python_file_name_to_generate.endswith(".py"):
-            python_file_name_to_generate = python_file_name_to_generate[:-3]
+        if target_python_file_name.endswith(".py"):
+            target_python_file_name = target_python_file_name[:-3]
         else:
             raise ValueError(
-                "The python_file_name_to_generate should end with .py")
+                "The target_python_file_name should end with .py")
 
-        self.python_file_name_to_generate = python_file_name_to_generate
+        self.target_python_file_name = target_python_file_name
         self.module_file_name = snake_to_camel(
-            self.python_file_name_to_generate) + "SIL"
+            self.target_python_file_name) + "SIL"
 
         self.SIL_folder = SIL_folder
 
@@ -204,6 +311,8 @@ class SIL_Operator:
         dir_path = os.path.dirname(self.this_file_path)
 
         self.root_path = os.path.abspath(os.path.join(dir_path, "../../"))
+
+        self.cpp_file_path_to_generate = ""
 
     @staticmethod
     def find_file_path(
@@ -219,6 +328,20 @@ class SIL_Operator:
                 return os.path.join(dirpath, file_name)
 
         raise FileNotFoundError(f"{file_name} not found in {root_path}")
+
+    def find_c_make_lists_txt(self) -> str:
+        """
+        Recursively search for a CMakeLists.txt file in the current directory
+          and return its full path.
+        Raises FileNotFoundError if the file is not found.
+        """
+
+        for dirpath, dirnames, filenames in os.walk(self.root_path):
+            if "CMakeLists.txt" in filenames:
+                return os.path.join(dirpath, "CMakeLists.txt")
+
+        raise FileNotFoundError(
+            f"CMakeLists.txt not found. Delete {self.cpp_file_path_to_generate} and try again.")
 
     def build_pybind11_code(self):
         """
@@ -243,24 +366,29 @@ class SIL_Operator:
         """
         Generate and build the SIL code for the given Python file.
         """
+        python_file_name = self.target_python_file_name + ".py"
 
-        python_file_name = self.python_file_name_to_generate + ".py"
-        python_file_path = SIL_Operator.find_file_path(
-            python_file_name, self.root_path).split(".py")[0]
+        python_file_path_with_extension = SIL_Operator.find_file_path(
+            python_file_name, self.root_path)
+        python_file_path = python_file_path_with_extension.split('.py')[0]
 
-        cpp_file_path_to_generate = python_file_path + ".cpp"
+        self.cpp_file_path_to_generate = python_file_path + ".cpp"
 
-        if not os.path.exists(cpp_file_path_to_generate):
+        if not os.path.exists(self.cpp_file_path_to_generate):
 
             PybindCppGenerator.generate_cpp_code(
-                self.module_file_name, cpp_file_path_to_generate)
+                python_file_path_with_extension,
+                self.module_file_name,
+                self.cpp_file_path_to_generate)
 
             cmake_generator = CmakeGenerator(
-                self.python_file_name_to_generate,
+                self.target_python_file_name,
                 os.path.dirname(python_file_path),
                 self.module_file_name,
                 self.SIL_folder,
                 self.root_path)
             cmake_generator.generate_cmake_lists_txt()
+        else:
+            self.find_c_make_lists_txt()
 
         self.build_pybind11_code()
