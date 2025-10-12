@@ -39,20 +39,39 @@ class CmakeGenerator:
 
         code_text += f"target_compile_options({SIL_lib_file_name} PRIVATE -Werror)\n\n"
 
-        code_text += f"target_include_directories({SIL_lib_file_name} PRIVATE\n"
-        code_text += "    ${CMAKE_SOURCE_DIR}/../../mpc_utility\n"
-        code_text += "    ${CMAKE_SOURCE_DIR}/../../python_mpc\n"
-        code_text += "    ${CMAKE_SOURCE_DIR}/../../external_libraries/python_optimization_to_cpp/optimization_utility\n"
-        code_text += "    ${CMAKE_SOURCE_DIR}/../../external_libraries/python_optimization_to_cpp/python_optimization\n"
-        code_text += "    ${CMAKE_SOURCE_DIR}/../../external_libraries/python_control_to_cpp/python_control\n"
-        code_text += "    ${CMAKE_SOURCE_DIR}/../../external_libraries/python_numpy_to_cpp/python_numpy\n"
-        code_text += "    ${CMAKE_SOURCE_DIR}/../../external_libraries/python_numpy_to_cpp/base_matrix\n"
-        code_text += "    ${CMAKE_SOURCE_DIR}/../../external_libraries/python_math_to_cpp/base_math\n"
-        code_text += "    ${CMAKE_SOURCE_DIR}/../../external_libraries/python_math_to_cpp/python_math\n"
-        code_text += "    ${CMAKE_SOURCE_DIR}/../../external_libraries/base_utility_cpp/base_utility\n"
-        code_text += "    ${CMAKE_SOURCE_DIR}/../../test_sil/" + \
-            f"{self.folder_name}\n"
-        code_text += ")\n\n"
+        code_text += f"target_include_directories({SIL_lib_file_name} PRIVATE\n)\n\n"
+
+        # Dynamically discover all directories under root_path that contain
+        # source files with extensions .c/.h/.cpp/.hpp and add them to the
+        # CMake target include directories. The CMakeLists will use a
+        # relative path like "${CMAKE_SOURCE_DIR}/../../<relpath>" where
+        # <relpath> is the path relative to self.root_path (typically the
+        # repository root).
+        src_exts = {'.c', '.h', '.cpp', '.hpp'}
+        include_dirs = []
+        seen = set()
+
+        # Normalize root_path
+        root = os.path.abspath(self.root_path)
+
+        for dirpath, dirnames, filenames in os.walk(root):
+            for fn in filenames:
+                _, ext = os.path.splitext(fn)
+                if ext.lower() in src_exts:
+                    # compute relative path from root
+                    rel = os.path.relpath(dirpath, root)
+                    # convert Windows backslashes to forward slashes for CMake
+                    rel = rel.replace('\\', '/')
+                    if rel == '.':
+                        rel = ''
+                    if rel not in seen:
+                        seen.add(rel)
+                        include_dirs.append(rel)
+                    break
+
+        for d in include_dirs:
+            if d != "":
+                code_text += "    ${CMAKE_SOURCE_DIR}/" + d + "\n"
 
         with open(os.path.join(self.SIL_folder, "CMakeLists.txt"), "w", encoding="utf-8") as f:
             f.write(code_text)
