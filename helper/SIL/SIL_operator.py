@@ -145,6 +145,16 @@ class SIL_Operator:
 
         self.root_path = os.path.abspath(os.path.join(dir_path, "../../"))
 
+    @staticmethod
+    def find_file_path(
+            file_name: str,
+            root_path: str) -> str:
+        for dirpath, dirnames, filenames in os.walk(root_path):
+            if file_name in filenames:
+                return os.path.join(dirpath, file_name)
+
+        raise FileNotFoundError(f"{file_name} not found in {root_path}")
+
     def build_pybind11_code(self):
 
         build_folder = os.path.join(self.SIL_folder, "build")
@@ -162,6 +172,13 @@ class SIL_Operator:
             f"mv {build_folder}/{self.generated_file_name}.*so {self.SIL_folder}", shell=True)
 
     def build_SIL_code(self):
+
+        python_file_name = self.python_file_name_to_generate + ".py"
+        python_file_path = SIL_Operator.find_file_path(
+            python_file_name, self.root_path)
+
+        cpp_file_path_to_generate = python_file_path.split(".py")[0] + ".cpp"
+
         cmake_generator = CmakeGenerator(
             self.python_file_name_to_generate,
             self.generated_file_name,
