@@ -18,6 +18,43 @@ class CmakeGenerator:
 
         self.root_path = root_path
 
+    @staticmethod
+    def discover_source_include_dirs(root_path: str, src_exts: set = None) -> list:
+        """Discover directories under root_path that contain source files.
+
+        Returns a list of paths relative to root_path (using forward slashes).
+        The function mirrors the behavior previously embedded in
+        CmakeGenerator.generate_cmake_lists_txt: it detects files with
+        extensions in src_exts, converts backslashes to forward slashes,
+        uses '' for the root directory, and preserves discovery order while
+        avoiding duplicates.
+        """
+        if src_exts is None:
+            src_exts = {'.c', '.h', '.cpp', '.hpp'}
+
+        include_dirs = []
+        seen = set()
+
+        # Normalize root_path
+        root = os.path.abspath(root_path)
+
+        for dirpath, dirnames, filenames in os.walk(root):
+            for fn in filenames:
+                _, ext = os.path.splitext(fn)
+                if ext.lower() in src_exts:
+                    # compute relative path from root
+                    rel = os.path.relpath(dirpath, root)
+                    # convert Windows backslashes to forward slashes for CMake
+                    rel = rel.replace('\\', '/')
+                    if rel == '.':
+                        rel = ''
+                    if rel not in seen:
+                        seen.add(rel)
+                        include_dirs.append(rel)
+                    break
+
+        return include_dirs
+
     def generate_cmake_lists_txt(self):
         SIL_lib_file_name = snake_to_camel(self.folder_name) + "SIL"
         SIL_cpp_file_name = self.folder_name + "_SIL"
@@ -40,34 +77,9 @@ class CmakeGenerator:
         code_text += f"target_compile_options({SIL_lib_file_name} PRIVATE -Werror)\n\n"
 
         code_text += f"target_include_directories({SIL_lib_file_name} PRIVATE\n)\n\n"
-
-        # Dynamically discover all directories under root_path that contain
-        # source files with extensions .c/.h/.cpp/.hpp and add them to the
-        # CMake target include directories. The CMakeLists will use a
-        # relative path like "${CMAKE_SOURCE_DIR}/../../<relpath>" where
-        # <relpath> is the path relative to self.root_path (typically the
-        # repository root).
-        src_exts = {'.c', '.h', '.cpp', '.hpp'}
-        include_dirs = []
-        seen = set()
-
-        # Normalize root_path
-        root = os.path.abspath(self.root_path)
-
-        for dirpath, dirnames, filenames in os.walk(root):
-            for fn in filenames:
-                _, ext = os.path.splitext(fn)
-                if ext.lower() in src_exts:
-                    # compute relative path from root
-                    rel = os.path.relpath(dirpath, root)
-                    # convert Windows backslashes to forward slashes for CMake
-                    rel = rel.replace('\\', '/')
-                    if rel == '.':
-                        rel = ''
-                    if rel not in seen:
-                        seen.add(rel)
-                        include_dirs.append(rel)
-                    break
+        # Discover include directories containing source files under root_path
+        include_dirs = CmakeGenerator.discover_source_include_dirs(
+            self.root_path)
 
         for d in include_dirs:
             if d != "":
