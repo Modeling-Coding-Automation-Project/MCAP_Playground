@@ -60,6 +60,11 @@ class SIL_CodeGenerator:
 
         self.folder_name = os.path.basename(os.path.normpath(self.SIL_folder))
 
+        self.this_file_path = os.path.abspath(__file__)
+        dir_path = os.path.dirname(self.this_file_path)
+
+        self.root_path = os.path.abspath(os.path.join(dir_path, "../../"))
+
     def move_deployed_files(self, file_names):
         for file_name in file_names:
             if isinstance(file_name, list):
