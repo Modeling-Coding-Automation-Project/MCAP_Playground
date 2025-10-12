@@ -2,16 +2,21 @@ import os
 import subprocess
 
 
-def snake_to_camel(snake_str):
+def snake_to_camel(snake_str: str) -> str:
     components = snake_str.split('_')
     return ''.join(x.title() for x in components)
 
 
 class CmakeGenerator:
-    def __init__(self, SIL_folder):
+    def __init__(
+        self,
+        SIL_folder: str,
+        root_path: str
+    ):
         self.SIL_folder = SIL_folder
-
         self.folder_name = os.path.basename(os.path.normpath(self.SIL_folder))
+
+        self.root_path = root_path
 
     def generate_cmake_lists_txt(self):
         SIL_lib_file_name = snake_to_camel(self.folder_name) + "SIL"
@@ -110,7 +115,7 @@ class SIL_CodeGenerator:
             f"mv {build_folder}/{generated_file_name}.*so {self.SIL_folder}", shell=True)
 
     def build_SIL_code(self):
-        cmake_generator = CmakeGenerator(self.SIL_folder)
+        cmake_generator = CmakeGenerator(self.SIL_folder, self.root_path)
         cmake_generator.generate_cmake_lists_txt()
 
         self.move_deployed_files(self.deployed_file_names)
