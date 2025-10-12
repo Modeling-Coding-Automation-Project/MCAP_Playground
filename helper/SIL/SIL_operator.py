@@ -120,6 +120,30 @@ class CmakeGenerator:
             f.write(code_text)
 
 
+class PybindCppGenerator:
+    @staticmethod
+    def generate_cpp_code(
+        module_name: str,
+        cpp_file_path_to_generate: str
+    ):
+        code_text = ""
+        code_text += "#include <pybind11/numpy.h>\n"
+        code_text += "#include <pybind11/pybind11.h>\n\n"
+
+        code_text += "namespace py = pybind11;\n\n"
+
+        code_text += "void initialize(void) {}\n\n"
+
+        code_text += f"PYBIND11_MODULE({module_name}, m) {{\n"
+
+        code_text += "    m.def(\"initialize\", &initialize, \"Initialize the module\");\n"
+
+        code_text += "}\n"
+
+        with open(cpp_file_path_to_generate, "w", encoding="utf-8") as f:
+            f.write(code_text)
+
+
 class SIL_Operator:
     def __init__(
         self,
@@ -133,7 +157,7 @@ class SIL_Operator:
                 "The python_file_name_to_generate should end with .py")
 
         self.python_file_name_to_generate = python_file_name_to_generate
-        self.generated_file_name = snake_to_camel(
+        self.module_file_name = snake_to_camel(
             self.python_file_name_to_generate) + "SIL"
 
         self.SIL_folder = SIL_folder
@@ -169,7 +193,7 @@ class SIL_Operator:
             f"cmake --build {build_folder} --config Release", shell=True)
 
         subprocess.run(
-            f"mv {build_folder}/{self.generated_file_name}.*so {self.SIL_folder}", shell=True)
+            f"mv {build_folder}/{self.module_file_name}.*so {self.SIL_folder}", shell=True)
 
     def build_SIL_code(self):
 
@@ -179,10 +203,15 @@ class SIL_Operator:
 
         cpp_file_path_to_generate = python_file_path.split(".py")[0] + ".cpp"
 
-        cmake_generator = CmakeGenerator(
-            self.python_file_name_to_generate,
-            self.generated_file_name,
-            self.SIL_folder, self.root_path)
-        cmake_generator.generate_cmake_lists_txt()
+        if not os.path.exists(cpp_file_path_to_generate):
+
+            PybindCppGenerator.generate_cpp_code(
+                self.module_file_name, cpp_file_path_to_generate)
+
+            cmake_generator = CmakeGenerator(
+                self.python_file_name_to_generate,
+                self.module_file_name,
+                self.SIL_folder, self.root_path)
+            cmake_generator.generate_cmake_lists_txt()
 
         self.build_pybind11_code()
