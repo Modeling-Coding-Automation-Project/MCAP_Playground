@@ -101,7 +101,7 @@ class CmakeGenerator:
 
         code_text += f"target_compile_options({SIL_lib_file_name} PRIVATE -Werror)\n\n"
 
-        code_text += f"target_include_directories({SIL_lib_file_name} PRIVATE\n)\n\n"
+        code_text += f"target_include_directories({SIL_lib_file_name} PRIVATE\n"
 
         include_dirs = CmakeGenerator.discover_source_include_dirs(
             self.root_path)
@@ -109,6 +109,8 @@ class CmakeGenerator:
         for d in include_dirs:
             if d != "":
                 code_text += "    ${CMAKE_SOURCE_DIR}/" + d + "\n"
+
+        code_text += ")\n\n"
 
         with open(os.path.join(self.SIL_folder, "CMakeLists.txt"), "w", encoding="utf-8") as f:
             f.write(code_text)
