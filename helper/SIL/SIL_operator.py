@@ -1,8 +1,28 @@
+"""
+File: SIL_operator.py
+
+Description: This file contains the SIL_Operator class, which is responsible for generating and building
+the SIL (Static Intermediate Language) code for a given Python file. It uses CMake and pybind11 to create
+a C++ extension module that can be imported in Python.
+
+Example code to use the SIL_Operator class:
+```
+import os
+from helper.SIL.SIL_operator import SIL_Operator
+
+current_dir = os.path.dirname(__file__)
+generator = SIL_Operator("my_func.py", current_dir)
+generator.build_SIL_code()
+```
+"""
 import os
 import subprocess
 
 
 def snake_to_camel(snake_str: str) -> str:
+    """
+    Convert a snake_case string to CamelCase.
+    """
     components = snake_str.split('_')
     return ''.join(x.title() for x in components)
 
@@ -26,6 +46,11 @@ class CmakeGenerator:
 
     @staticmethod
     def check_path_is_sample(path: str) -> str:
+        """
+        Check if the given path is under "external_libraries" and contains
+        "sample", "test_sil", or "test_vs" folders. If so, return an empty string.
+        Otherwise, return the original path.
+        """
 
         path_folders = path.split('/')
         external_libraries_flag = False
@@ -48,7 +73,8 @@ class CmakeGenerator:
 
     @staticmethod
     def discover_source_include_dirs(root_path: str, src_exts: set = None) -> list:
-        """Discover directories under root_path that contain source files.
+        """
+        Discover directories under root_path that contain source files.
 
         Returns a list of paths relative to root_path (using forward slashes).
         The function mirrors the behavior previously embedded in
@@ -87,6 +113,10 @@ class CmakeGenerator:
         return include_dirs
 
     def generate_cmake_lists_txt(self):
+        """
+        Generate a CMakeLists.txt file for building the pybind11 module.
+        """
+
         SIL_cpp_file_name = self.folder_name + "_SIL"
 
         code_text = ""
@@ -128,6 +158,10 @@ class PybindCppGenerator:
         module_name: str,
         cpp_file_path_to_generate: str
     ):
+        """
+        Generate a C++ file that defines a pybind11 module with an initialize function.
+        """
+
         code_text = ""
         code_text += "#include <pybind11/numpy.h>\n"
         code_text += "#include <pybind11/pybind11.h>\n\n"
@@ -175,6 +209,11 @@ class SIL_Operator:
     def find_file_path(
             file_name: str,
             root_path: str) -> str:
+        """
+        Recursively search for a file in the given root_path and return its full path.
+        Raises FileNotFoundError if the file is not found.
+        """
+
         for dirpath, dirnames, filenames in os.walk(root_path):
             if file_name in filenames:
                 return os.path.join(dirpath, file_name)
@@ -182,6 +221,9 @@ class SIL_Operator:
         raise FileNotFoundError(f"{file_name} not found in {root_path}")
 
     def build_pybind11_code(self):
+        """
+        Build the pybind11 C++ code using CMake.
+        """
 
         build_folder = os.path.join(self.SIL_folder, "build")
 
@@ -198,6 +240,9 @@ class SIL_Operator:
             f"mv {build_folder}/{self.module_file_name}.*so {self.SIL_folder}", shell=True)
 
     def build_SIL_code(self):
+        """
+        Generate and build the SIL code for the given Python file.
+        """
 
         python_file_name = self.python_file_name_to_generate + ".py"
         python_file_path = SIL_Operator.find_file_path(
