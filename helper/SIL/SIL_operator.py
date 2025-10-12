@@ -17,6 +17,7 @@ generator.build_SIL_code()
 """
 import os
 import subprocess
+import ast
 
 
 def snake_to_camel(snake_str: str) -> str:
@@ -152,6 +153,80 @@ class CmakeGenerator:
             f.write(code_text)
 
 
+class PythonAnalyzer:
+    """
+    Analyze a Python source file and extract class definitions and their methods.
+
+    Usage:
+        classes = PythonAnalyzer.parse_file('/path/to/file.py')
+        # classes -> dict where keys are class names and values are lists of method info dicts
+
+    Each method info dict contains:
+        - name: method name
+        - lineno: line number where the method is defined
+        - decorators: list of decorator names (as strings)
+    """
+    @staticmethod
+    def _get_decorator_name(decorator_node):
+        # Try to recover a readable decorator name from AST node
+        if isinstance(decorator_node, ast.Name):
+            return decorator_node.id
+        elif isinstance(decorator_node, ast.Attribute):
+            parts = []
+            node = decorator_node
+            while isinstance(node, ast.Attribute):
+                parts.append(node.attr)
+                node = node.value
+            if isinstance(node, ast.Name):
+                parts.append(node.id)
+            return ".".join(reversed(parts))
+        elif isinstance(decorator_node, ast.Call):
+            # decorator with arguments, get the function part
+            return PythonAnalyzer._get_decorator_name(decorator_node.func)
+        else:
+            return ast.dump(decorator_node)
+
+    @staticmethod
+    def parse_source(source: str) -> dict:
+        """
+        Parse source text and return a mapping of class names to a list of methods.
+        """
+        tree = ast.parse(source)
+
+        classes = {}
+
+        for node in tree.body:
+            if isinstance(node, ast.ClassDef):
+                class_name = node.name
+                methods = []
+                for item in node.body:
+                    if isinstance(item, ast.FunctionDef):
+                        decorators = [PythonAnalyzer._get_decorator_name(
+                            d) for d in item.decorator_list]
+                        methods.append({
+                            'name': item.name,
+                            'lineno': getattr(item, 'lineno', None),
+                            'decorators': decorators,
+                        })
+                classes[class_name] = methods
+
+        return classes
+
+    @staticmethod
+    def parse_file(path: str) -> dict:
+        """
+        Read a Python file from given path and parse it for classes and methods.
+        Raises FileNotFoundError if the file doesn't exist, and SyntaxError for invalid Python.
+        """
+        if not os.path.exists(path):
+            raise FileNotFoundError(f"{path} not found")
+
+        with open(path, 'r', encoding='utf-8') as f:
+            src = f.read()
+
+        return PythonAnalyzer.parse_source(src)
+
+
 class PybindCppGenerator:
     @staticmethod
     def generate_cpp_code(
@@ -162,6 +237,17 @@ class PybindCppGenerator:
         """
         Generate a C++ file that defines a pybind11 module with an initialize function.
         """
+
+        # analyze the python file to find classes and methods
+        classes = PythonAnalyzer.parse_file(python_file_path_with_extension)
+
+        if not classes:
+            raise ValueError(
+                f"No classes found in {python_file_path_with_extension}. Cannot generate SIL code.")
+        if len(classes) > 1:
+            raise ValueError(
+                f"Multiple classes found in {python_file_path_with_extension}. Only one class is supported.")
+
         code_text = ""
         code_text += "#include <pybind11/numpy.h>\n"
         code_text += "#include <pybind11/pybind11.h>\n\n"
@@ -170,9 +256,27 @@ class PybindCppGenerator:
 
         code_text += "void initialize(void) {}\n\n"
 
+        method_names = set()
+        for class_name, methods in classes.items():
+            code_text += f"// Class: {class_name}\n"
+            for method in methods:
+                method_name = method['name']
+
+                if method_name.startswith("__") and method_name.endswith("__"):
+                    # Skip dunder methods
+                    continue
+
+                code_text += f"// Method: {method_name}\n"
+                code_text += f"void {method_name}(void) {{}}\n\n"
+
+                method_names.add(method_name)
+
         code_text += f"PYBIND11_MODULE({module_name}, m) {{\n"
 
         code_text += "    m.def(\"initialize\", &initialize, \"Initialize the module\");\n"
+
+        for method_name in method_names:
+            code_text += f"    m.def(\"{method_name}\", &{method_name}, \"{method_name} method\");\n"
 
         code_text += "}\n"
 
@@ -224,13 +328,12 @@ class SIL_Operator:
 
     def find_c_make_lists_txt(self) -> str:
         """
-        Recursively search for a CMakeLists.txt file in the current directory and return its full path.
+        Recursively search for a CMakeLists.txt file in the current directory
+          and return its full path.
         Raises FileNotFoundError if the file is not found.
         """
 
-        current_dir = os.path.dirname(os.path.abspath(__file__))
-
-        for dirpath, dirnames, filenames in os.walk(current_dir):
+        for dirpath, dirnames, filenames in os.walk(self.root_path):
             if "CMakeLists.txt" in filenames:
                 return os.path.join(dirpath, "CMakeLists.txt")
 
