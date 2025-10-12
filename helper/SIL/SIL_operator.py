@@ -10,9 +10,13 @@ def snake_to_camel(snake_str: str) -> str:
 class CmakeGenerator:
     def __init__(
         self,
+        original_python_file_name: str,
+        pybind11_module_name: str,
         SIL_folder: str,
         root_path: str
     ):
+        self.original_python_file_name = original_python_file_name
+        self.pybind11_module_name = pybind11_module_name
         self.SIL_folder = SIL_folder
         self.folder_name = os.path.basename(os.path.normpath(self.SIL_folder))
 
@@ -81,14 +85,13 @@ class CmakeGenerator:
         return include_dirs
 
     def generate_cmake_lists_txt(self):
-        SIL_lib_file_name = snake_to_camel(self.folder_name) + "SIL"
         SIL_cpp_file_name = self.folder_name + "_SIL"
 
         code_text = ""
         code_text += "cmake_minimum_required(VERSION 3.14)\n"
         code_text += "cmake_policy(SET CMP0148 NEW)\n\n"
 
-        code_text += f"project({SIL_lib_file_name})\n\n"
+        code_text += f"project({self.pybind11_module_name})\n\n"
 
         code_text += "set(CMAKE_CXX_STANDARD 11)\n"
         code_text += "set(CMAKE_CXX_STANDARD_REQUIRED ON)\n"
@@ -97,11 +100,12 @@ class CmakeGenerator:
 
         code_text += "find_package(pybind11 REQUIRED)\n\n"
 
-        code_text += f"pybind11_add_module({SIL_lib_file_name} {SIL_cpp_file_name}.cpp)\n\n"
+        code_text += f"pybind11_add_module({self.pybind11_module_name} " + \
+            f"{self.original_python_file_name}.cpp)\n\n"
 
-        code_text += f"target_compile_options({SIL_lib_file_name} PRIVATE -Werror)\n\n"
+        code_text += f"target_compile_options({self.pybind11_module_name} PRIVATE -Werror)\n\n"
 
-        code_text += f"target_include_directories({SIL_lib_file_name} PRIVATE\n"
+        code_text += f"target_include_directories({self.pybind11_module_name} PRIVATE\n"
 
         include_dirs = CmakeGenerator.discover_source_include_dirs(
             self.root_path)
@@ -122,7 +126,16 @@ class SIL_Operator:
         python_file_name_to_generate: str,
         SIL_folder: str
     ):
+        if python_file_name_to_generate.endswith(".py"):
+            python_file_name_to_generate = python_file_name_to_generate[:-3]
+        else:
+            raise ValueError(
+                "The python_file_name_to_generate should end with .py")
+
         self.python_file_name_to_generate = python_file_name_to_generate
+        self.generated_file_name = snake_to_camel(
+            self.python_file_name_to_generate) + "SIL"
+
         self.SIL_folder = SIL_folder
 
         self.folder_name = os.path.basename(os.path.normpath(self.SIL_folder))
@@ -135,8 +148,6 @@ class SIL_Operator:
     def build_pybind11_code(self):
 
         build_folder = os.path.join(self.SIL_folder, "build")
-        generated_file_name = snake_to_camel(
-            self.python_file_name_to_generate) + "SIL"
 
         subprocess.run(f"rm -rf {build_folder}", shell=True)
         subprocess.run(f"mkdir -p {build_folder}", shell=True)
@@ -148,10 +159,13 @@ class SIL_Operator:
             f"cmake --build {build_folder} --config Release", shell=True)
 
         subprocess.run(
-            f"mv {build_folder}/{generated_file_name}.*so {self.SIL_folder}", shell=True)
+            f"mv {build_folder}/{self.generated_file_name}.*so {self.SIL_folder}", shell=True)
 
     def build_SIL_code(self):
-        cmake_generator = CmakeGenerator(self.SIL_folder, self.root_path)
+        cmake_generator = CmakeGenerator(
+            self.python_file_name_to_generate,
+            self.generated_file_name,
+            self.SIL_folder, self.root_path)
         cmake_generator.generate_cmake_lists_txt()
 
         self.build_pybind11_code()
