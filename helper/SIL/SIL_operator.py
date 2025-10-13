@@ -76,6 +76,21 @@ class CmakeGenerator:
             return path
 
     @staticmethod
+    def check_path_is_build(path: str) -> str:
+        """
+        Check if the given path is under "build". If so, return an empty string.
+        Otherwise, return the original path.
+        """
+
+        path_folders = path.split('/')
+
+        for i, folder in enumerate(path_folders):
+            if folder.lower() == "build":
+                return ""
+
+        return path
+
+    @staticmethod
     def discover_source_include_dirs(
         root_path: str,
         source_header_extensions: set = None
@@ -112,6 +127,7 @@ class CmakeGenerator:
                         rel = ''
 
                     rel = CmakeGenerator.check_path_is_sample(rel)
+                    rel = CmakeGenerator.check_path_is_build(rel)
 
                     if (rel not in seen) and (rel != ""):
                         seen.add(rel)
@@ -144,6 +160,7 @@ class CmakeGenerator:
                     if rel == '.':
                         rel = ''
                     rel = CmakeGenerator.check_path_is_sample(rel)
+                    rel = CmakeGenerator.check_path_is_build(rel)
 
                     if rel != "":
                         source_file_list.append(os.path.join(dirpath, fn))
@@ -173,7 +190,7 @@ class CmakeGenerator:
         code_text += "find_package(pybind11 REQUIRED)\n\n"
 
         code_text += f"pybind11_add_module({self.pybind11_module_name} \n"
-        code_text += f"{self.python_file_dir}/{self.original_python_file_name}.cpp"
+        code_text += f"{self.python_file_dir}/{self.original_python_file_name}.cpp\n"
 
         for source_file in source_file_list:
             if source_file != f"{self.python_file_dir}/{self.original_python_file_name}.cpp":
