@@ -36,6 +36,7 @@ class CmakeGenerator:
         self,
         original_python_file_name: str,
         python_file_dir: str,
+        cpp_file_name: str,
         pybind11_module_name: str,
         SIL_folder: str,
         root_path: str
@@ -47,6 +48,8 @@ class CmakeGenerator:
 
         self.root_path = root_path
         self.python_file_dir = python_file_dir
+
+        self.cpp_file_name = cpp_file_name
 
     @staticmethod
     def check_path_is_sample(path: str) -> str:
@@ -190,11 +193,11 @@ class CmakeGenerator:
         code_text += "find_package(pybind11 REQUIRED)\n\n"
 
         code_text += f"pybind11_add_module({self.pybind11_module_name} \n"
-        code_text += f"{self.python_file_dir}/{self.original_python_file_name}.cpp\n"
+        code_text += f"    {self.python_file_dir}/{self.cpp_file_name}\n"
 
         for source_file in source_file_list:
-            if source_file != f"{self.python_file_dir}/{self.original_python_file_name}.cpp":
-                code_text += f"{source_file}\n"
+            if source_file != f"{self.python_file_dir}/{self.cpp_file_name}":
+                code_text += f"    {source_file}\n"
 
         code_text += ")\n\n"
 
@@ -428,16 +431,19 @@ class SIL_Operator:
             python_file_name, self.root_path)
         python_file_path = python_file_path_with_extension.split('.py')[0]
 
-        self.cpp_file_path_to_generate = python_file_path + ".cpp"
+        self.cpp_file_path_to_generate = python_file_path + "_SIL.cpp"
 
-        PybindCppGenerator.generate_cpp_code(
-            python_file_path_with_extension,
-            self.module_file_name,
-            self.cpp_file_path_to_generate)
+        if not os.path.exists(self.cpp_file_path_to_generate):
+            PybindCppGenerator.generate_cpp_code(
+                python_file_path_with_extension,
+                self.module_file_name,
+                self.cpp_file_path_to_generate
+            )
 
         cmake_generator = CmakeGenerator(
             self.target_python_file_name,
             os.path.dirname(python_file_path),
+            self.cpp_file_path_to_generate.split('/')[-1],
             self.module_file_name,
             self.SIL_folder,
             self.root_path)
