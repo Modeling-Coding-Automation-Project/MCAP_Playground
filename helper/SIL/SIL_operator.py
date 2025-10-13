@@ -36,6 +36,7 @@ class CmakeGenerator:
         self,
         original_python_file_name: str,
         python_file_dir: str,
+        cpp_file_name: str,
         pybind11_module_name: str,
         SIL_folder: str,
         root_path: str
@@ -47,6 +48,8 @@ class CmakeGenerator:
 
         self.root_path = root_path
         self.python_file_dir = python_file_dir
+
+        self.cpp_file_name = cpp_file_name
 
     @staticmethod
     def check_path_is_sample(path: str) -> str:
@@ -76,38 +79,58 @@ class CmakeGenerator:
             return path
 
     @staticmethod
-    def discover_source_include_dirs(root_path: str, src_exts: set = None) -> list:
+    def check_path_is_build(path: str) -> str:
+        """
+        Check if the given path is under "build". If so, return an empty string.
+        Otherwise, return the original path.
+        """
+
+        path_folders = path.split('/')
+
+        for i, folder in enumerate(path_folders):
+            if folder.lower() == "build":
+                return ""
+
+        return path
+
+    @staticmethod
+    def discover_source_include_dirs(
+        root_path: str,
+        source_header_extensions: set = None
+    ) -> list:
         """
         Discover directories under root_path that contain source files.
 
         Returns a list of paths relative to root_path (using forward slashes).
         The function mirrors the behavior previously embedded in
         CmakeGenerator.generate_cmake_lists_txt: it detects files with
-        extensions in src_exts, converts backslashes to forward slashes,
+        extensions in source_header_extensions, converts backslashes to forward slashes,
         uses '' for the root directory, and preserves discovery order while
         avoiding duplicates.
         """
-        if src_exts is None:
-            src_exts = {'.c', '.h', '.cpp', '.hpp'}
+        if source_header_extensions is None:
+            source_header_extensions = {'.c', '.h', '.cpp', '.hpp'}
 
         include_dirs = []
+
         seen = set()
 
         # Normalize root_path
         root = os.path.abspath(root_path)
 
+        # include_dirs
         for dirpath, dirnames, filenames in os.walk(root):
             for fn in filenames:
                 _, ext = os.path.splitext(fn)
-                if ext.lower() in src_exts:
-                    # compute relative path from root
+                if ext.lower() in source_header_extensions:
+
                     rel = os.path.relpath(dirpath, root)
-                    # convert Windows backslashes to forward slashes for CMake
                     rel = rel.replace('\\', '/')
                     if rel == '.':
                         rel = ''
 
                     rel = CmakeGenerator.check_path_is_sample(rel)
+                    rel = CmakeGenerator.check_path_is_build(rel)
 
                     if (rel not in seen) and (rel != ""):
                         seen.add(rel)
@@ -116,12 +139,45 @@ class CmakeGenerator:
 
         return include_dirs
 
+    @staticmethod
+    def discover_source_files(
+        root_path: str,
+        source_extensions: set = None
+    ) -> list:
+
+        if source_extensions is None:
+            source_extensions = {'.c', '.cpp'}
+
+        source_file_list = []
+
+        # Normalize root_path
+        root = os.path.abspath(root_path)
+
+        for dirpath, dirnames, filenames in os.walk(root):
+            for fn in filenames:
+                _, ext = os.path.splitext(fn)
+                if ext.lower() in source_extensions:
+
+                    rel = os.path.relpath(dirpath, root)
+                    rel = rel.replace('\\', '/')
+                    if rel == '.':
+                        rel = ''
+                    rel = CmakeGenerator.check_path_is_sample(rel)
+                    rel = CmakeGenerator.check_path_is_build(rel)
+
+                    if rel != "":
+                        source_file_list.append(os.path.join(dirpath, fn))
+
+        return source_file_list
+
     def generate_cmake_lists_txt(self):
         """
         Generate a CMakeLists.txt file for building the pybind11 module.
         """
-
-        SIL_cpp_file_name = self.folder_name + "_SIL"
+        include_dirs = CmakeGenerator.discover_source_include_dirs(
+            self.root_path)
+        source_file_list = CmakeGenerator.discover_source_files(
+            self.root_path)
 
         code_text = ""
         code_text += "cmake_minimum_required(VERSION 3.14)\n"
@@ -136,15 +192,18 @@ class CmakeGenerator:
 
         code_text += "find_package(pybind11 REQUIRED)\n\n"
 
-        code_text += f"pybind11_add_module({self.pybind11_module_name} " + \
-            f"{self.python_file_dir}/{self.original_python_file_name}.cpp)\n\n"
+        code_text += f"pybind11_add_module({self.pybind11_module_name} \n"
+        code_text += f"    {self.python_file_dir}/{self.cpp_file_name}\n"
+
+        for source_file in source_file_list:
+            if source_file != f"{self.python_file_dir}/{self.cpp_file_name}":
+                code_text += f"    {source_file}\n"
+
+        code_text += ")\n\n"
 
         code_text += f"target_compile_options({self.pybind11_module_name} PRIVATE -Werror)\n\n"
 
         code_text += f"target_include_directories({self.pybind11_module_name} PRIVATE\n"
-
-        include_dirs = CmakeGenerator.discover_source_include_dirs(
-            self.root_path)
 
         for d in include_dirs:
             if d != "":
@@ -372,23 +431,22 @@ class SIL_Operator:
             python_file_name, self.root_path)
         python_file_path = python_file_path_with_extension.split('.py')[0]
 
-        self.cpp_file_path_to_generate = python_file_path + ".cpp"
+        self.cpp_file_path_to_generate = python_file_path + "_SIL.cpp"
 
         if not os.path.exists(self.cpp_file_path_to_generate):
-
             PybindCppGenerator.generate_cpp_code(
                 python_file_path_with_extension,
                 self.module_file_name,
-                self.cpp_file_path_to_generate)
+                self.cpp_file_path_to_generate
+            )
 
-            cmake_generator = CmakeGenerator(
-                self.target_python_file_name,
-                os.path.dirname(python_file_path),
-                self.module_file_name,
-                self.SIL_folder,
-                self.root_path)
-            cmake_generator.generate_cmake_lists_txt()
-        else:
-            self.find_c_make_lists_txt()
+        cmake_generator = CmakeGenerator(
+            self.target_python_file_name,
+            os.path.dirname(python_file_path),
+            self.cpp_file_path_to_generate.split('/')[-1],
+            self.module_file_name,
+            self.SIL_folder,
+            self.root_path)
+        cmake_generator.generate_cmake_lists_txt()
 
         self.build_pybind11_code()
