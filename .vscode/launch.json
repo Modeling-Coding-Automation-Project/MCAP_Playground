@@ -41,7 +41,7 @@
       "type": "cppdbg",
       "request": "launch",
       "program": "/usr/bin/python3",
-      "args": ["${workspaceFolder}/test.py"],
+      "args": ["${file}"],
       "stopAtEntry": false,
       "cwd": "${workspaceFolder}",
       "environment": [],
