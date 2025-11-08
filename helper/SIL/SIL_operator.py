@@ -158,14 +158,16 @@ class CmakeGenerator:
                 _, ext = os.path.splitext(fn)
                 if ext.lower() in source_extensions:
 
-                    rel = os.path.relpath(dirpath, root)
-                    rel = rel.replace('\\', '/')
-                    if rel == '.':
-                        rel = ''
+                    original_rel = os.path.relpath(dirpath, root)
+                    original_rel = original_rel.replace('\\', '/')
+
+                    is_root = (original_rel == '.')
+                    rel = '' if is_root else original_rel
+
                     rel = CmakeGenerator.check_path_is_sample(rel)
                     rel = CmakeGenerator.check_path_is_build(rel)
 
-                    if rel != "":
+                    if not (rel == "" and not is_root):
                         source_file_list.append(os.path.join(dirpath, fn))
 
         return source_file_list
