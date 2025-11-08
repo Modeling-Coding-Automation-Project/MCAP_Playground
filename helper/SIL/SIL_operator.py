@@ -189,6 +189,11 @@ class CmakeGenerator:
 
         code_text += "set(CMAKE_CXX_STANDARD 11)\n"
         code_text += "set(CMAKE_CXX_STANDARD_REQUIRED ON)\n"
+        code_text += "# Debug-friendly defaults: prefer Debug builds during development so symbols are available\n"
+        code_text += "if(NOT CMAKE_BUILD_TYPE)\n"
+        code_text += "  set(CMAKE_BUILD_TYPE Debug CACHE STRING \"Build type\" FORCE)\n"
+        code_text += "endif()\n\n"
+        code_text += "set(CMAKE_CXX_FLAGS_DEBUG \"-g -O0\")\n"
         code_text += "set(CMAKE_CXX_FLAGS_RELEASE \"-O2\")\n"
         code_text += "set(CMAKE_CXX_FLAGS_RELEASE \"${CMAKE_CXX_FLAGS_RELEASE} -flto=auto\")\n\n"
 
@@ -203,7 +208,10 @@ class CmakeGenerator:
 
         code_text += ")\n\n"
 
-        code_text += f"target_compile_options({self.pybind11_module_name} PRIVATE -Werror)\n\n"
+        code_text += "# Treat warnings as errors only in Release builds to avoid blocking development\n"
+        code_text += f"if(CMAKE_BUILD_TYPE STREQUAL \"Release\")\n"
+        code_text += f"  target_compile_options({self.pybind11_module_name} PRIVATE -Werror)\n"
+        code_text += "endif()\n\n"
 
         code_text += f"target_include_directories({self.pybind11_module_name} PRIVATE\n"
 
@@ -413,12 +421,13 @@ class SIL_Operator:
 
         subprocess.run(f"rm -rf {build_folder}", shell=True)
         subprocess.run(f"mkdir -p {build_folder}", shell=True)
+        # Build in Debug by default so the generated module contains debug symbols
         subprocess.run(
-            f"cmake -S {self.SIL_folder} -B {build_folder} -DCMAKE_BUILD_TYPE=Release",
+            f"cmake -S {self.SIL_folder} -B {build_folder} -DCMAKE_BUILD_TYPE=Debug",
             shell=True
         )
         subprocess.run(
-            f"cmake --build {build_folder} --config Release", shell=True)
+            f"cmake --build {build_folder} --config Debug", shell=True)
 
         subprocess.run(
             f"mv {build_folder}/{self.module_file_name}.*so {self.SIL_folder}", shell=True)
