@@ -27,7 +27,7 @@ jobs:
         run: git clone https://github.com/Modeling-Coding-Automation-Project/MCAP_repo_manager.git
 
       - name: Build Docker image
-        run: docker build -t ghcr.io/Modeling-Coding-Automation-Project/mcap_env:latest ./MCAP_repo_manager/docker/docker_image_creation
+        run: docker build -t ghcr.io/modeling-coding-automation-project/mcap_env:latest ./MCAP_repo_manager/docker/docker_image_creation
 
       - name: Push Docker image
-        run: docker push ghcr.io/Modeling-Coding-Automation-Project/mcap_env:latest
+        run: docker push ghcr.io/modeling-coding-automation-project/mcap_env:latest
