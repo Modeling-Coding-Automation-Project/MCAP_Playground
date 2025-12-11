@@ -6,6 +6,10 @@ on:
       - main
       - feature/*
 
+permissions:
+  contents: read
+  packages: write
+
 jobs:
 
   build_and_push_docker_image:
