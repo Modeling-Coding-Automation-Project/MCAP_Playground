@@ -3,11 +3,11 @@
 
 #include "python_numpy.hpp"
 
-using FLOAT = double;
-constexpr std::size_t MATRIX_SIZE = 3;
-
 class SampleMatrix {
 public:
+  using FLOAT = double;
+  static constexpr std::size_t MATRIX_SIZE = 3;
+
   using DenseMatrix_Type =
       PythonNumpy::DenseMatrix_Type<FLOAT, MATRIX_SIZE, MATRIX_SIZE>;
 

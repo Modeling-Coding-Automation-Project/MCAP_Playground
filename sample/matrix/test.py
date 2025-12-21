@@ -14,8 +14,8 @@ current_dir = os.path.dirname(__file__)
 generator = SIL_Operator("sample_matrix.py", current_dir)
 generator.build_SIL_code()
 
-# import MyFuncSIL
-# MyFuncSIL.initialize()
+import SampleMatrixSIL
+SampleMatrixSIL.initialize()
 
 
 def main():
@@ -31,6 +31,10 @@ def main():
     # Matrix addition
     C = sm.add(A, B)
     print("Matrix Addition, numpy result:\n", C)
+
+    # test C++ SIL result
+    C_sil = SampleMatrixSIL.add(A, B)
+    print("Matrix Addition, C++ SIL result:\n", C_sil)
 
 
 if __name__ == "__main__":
