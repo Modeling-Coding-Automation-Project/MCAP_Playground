@@ -1,4 +1,5 @@
 import numpy as np
+from sample_matrix import SampleMatrix
 
 
 def main():
@@ -9,8 +10,10 @@ def main():
 
     B = np.diag([1, 2, 3])
 
+    sm = SampleMatrix()
+
     # Matrix addition
-    C = A + B
+    C = sm.add(A, B)
     print("Matrix Addition, numpy result:\n", C)
 
 
