@@ -1,3 +1,9 @@
+"""
+Test script for SampleMatrix module using SIL operator.
+
+This script demonstrates the creation of matrices, performing matrix addition,
+and comparing results between NumPy and C++ SIL implementations.
+"""
 import os
 import sys
 from pathlib import Path
