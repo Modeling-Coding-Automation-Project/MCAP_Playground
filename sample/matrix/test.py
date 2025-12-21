@@ -1,5 +1,21 @@
+import os
+import sys
+from pathlib import Path
+
+sys.path.append(str(Path(__file__).resolve().parents[1]))
+sys.path.append(str(Path(__file__).resolve().parents[2]))
+
 import numpy as np
 from sample_matrix import SampleMatrix
+
+from helper.SIL.SIL_operator import SIL_Operator
+
+current_dir = os.path.dirname(__file__)
+generator = SIL_Operator("sample_matrix.py", current_dir)
+generator.build_SIL_code()
+
+# import MyFuncSIL
+# MyFuncSIL.initialize()
 
 
 def main():
