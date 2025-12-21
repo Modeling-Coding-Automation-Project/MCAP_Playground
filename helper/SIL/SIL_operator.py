@@ -217,7 +217,10 @@ class CmakeGenerator:
 
         for d in include_dirs:
             if d != "":
-                code_text += "    ${CMAKE_SOURCE_DIR}/" + d + "\n"
+                # absolute_dir
+                path = os.path.abspath(os.path.join(self.root_path, d))
+
+                code_text += "    " + path + "\n"
 
         code_text += ")\n\n"
 
