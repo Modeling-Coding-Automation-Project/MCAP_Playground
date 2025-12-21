@@ -40,7 +40,7 @@
       "name": "Debug C++ in Python (gdb)",
       "type": "cppdbg",
       "request": "launch",
-      "program": "/usr/bin/python3",
+      "program": "/opt/venv_py_MCAP/bin/python3",
       "args": ["${file}"],
       "stopAtEntry": false,
       "cwd": "${workspaceFolder}",

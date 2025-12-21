@@ -46,7 +46,7 @@ py::array_t<SampleMatrix::FLOAT> add(py::array_t<SampleMatrix::FLOAT> A_in,
   SampleMatrix::FLOAT *B_data_ptr =
       static_cast<SampleMatrix::FLOAT *>(B_info.ptr);
   for (std::size_t i = 0; i < SampleMatrix::MATRIX_SIZE; i++) {
-    B(i) = B_data_ptr[i];
+    B(i) = B_data_ptr[i * SampleMatrix::MATRIX_SIZE + i];
   }
 
   /* call add method */
