@@ -3,60 +3,34 @@ name: Check build path
 on:
   push:
     branches:
-      - develop
+    - develop
 
 jobs:
-
   check_build_path:
-
     runs-on: ubuntu-latest
+
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-          submodules: true
-
-      - name: Verify include paths from tasks.json
-        env:
-          GITHUB_WORKSPACE: ${{ github.workspace }}
-        run: |
-          set -euo pipefail
-          python3 - <<'PY'
-          import os, re, json, sys
-
-          gw = os.environ.get('GITHUB_WORKSPACE', os.getcwd())
-          tasks_path = os.path.join(gw, '.vscode', 'tasks.json')
-          if not os.path.exists(tasks_path):
-              print('ERROR: .vscode/tasks.json not found at', tasks_path)
-              sys.exit(1)
-
-          s = open(tasks_path, 'r', encoding='utf-8').read()
-          s = re.sub(r'/\*.*?\*/', '', s, flags=re.S)
-          s = re.sub(r'//.*$', '', s, flags=re.M)
-          try:
-              data = json.loads(s)
-          except Exception as e:
-              print('ERROR: Failed to parse .vscode/tasks.json:', e)
-              sys.exit(1)
-
-          missing = []
-          for task in data.get('tasks', []):
-              for a in task.get('args', []) or []:
-                  if not isinstance(a, str):
-                      continue
-                  if a.startswith('-I'):
-                      p = a[2:]
-                      p = p.replace('${workspaceFolder}', gw)
-                      p = os.path.expandvars(p)
-                      p = os.path.normpath(p)
-                      if not os.path.exists(p):
-                          missing.append(p)
-
-          if missing:
-              print('ERROR: The following include directories are missing:')
-              for m in missing:
-                  print(' -', m)
-              sys.exit(1)
-          print('All include paths from .vscode/tasks.json exist.')
-          PY
+    - name: Checkout
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+        submodules: true
+    - name: Verify include paths from tasks.json
+      env:
+        GITHUB_WORKSPACE: ${{ github.workspace }}
+      run: "set -euo pipefail\npython3 - <<'PY'\nimport os, re, json, sys\n\ngw =\
+        \ os.environ.get('GITHUB_WORKSPACE', os.getcwd())\ntasks_path = os.path.join(gw,\
+        \ '.vscode', 'tasks.json')\nif not os.path.exists(tasks_path):\n    print('ERROR:\
+        \ .vscode/tasks.json not found at', tasks_path)\n    sys.exit(1)\n\ns = open(tasks_path,\
+        \ 'r', encoding='utf-8').read()\ns = re.sub(r'/\\*.*?\\*/', '', s, flags=re.S)\n\
+        s = re.sub(r'//.*$', '', s, flags=re.M)\ntry:\n    data = json.loads(s)\n\
+        except Exception as e:\n    print('ERROR: Failed to parse .vscode/tasks.json:',\
+        \ e)\n    sys.exit(1)\n\nmissing = []\nfor task in data.get('tasks', []):\n\
+        \    for a in task.get('args', []) or []:\n        if not isinstance(a, str):\n\
+        \            continue\n        if a.startswith('-I'):\n            p = a[2:]\n\
+        \            p = p.replace('${workspaceFolder}', gw)\n            p = os.path.expandvars(p)\n\
+        \            p = os.path.normpath(p)\n            if not os.path.exists(p):\n\
+        \                missing.append(p)\n\nif missing:\n    print('ERROR: The following\
+        \ include directories are missing:')\n    for m in missing:\n        print('\
+        \ -', m)\n    sys.exit(1)\nprint('All include paths from .vscode/tasks.json\
+        \ exist.')\nPY"
