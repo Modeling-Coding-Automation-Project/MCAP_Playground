@@ -3,6 +3,8 @@
 
 #include "sample_matrix.hpp"
 
+namespace sample_matrix_SIL {
+
 namespace py = pybind11;
 
 SampleMatrix sm;
@@ -70,3 +72,5 @@ PYBIND11_MODULE(SampleMatrixSIL, m) {
   m.def("initialize", &initialize, "Initialize the module");
   m.def("add", &add, "add method");
 }
+
+} // namespace sample_matrix_SIL
