@@ -402,6 +402,8 @@ class SIL_Operator:
         target_python_file_name: str,
         SIL_folder: str
     ):
+        self.root_path = os.getcwd()
+
         if target_python_file_name.endswith(".py"):
             target_python_file_name = target_python_file_name[:-3]
         else:
@@ -418,8 +420,6 @@ class SIL_Operator:
 
         self.this_file_path = os.path.abspath(__file__)
         dir_path = os.path.dirname(self.this_file_path)
-
-        self.root_path = os.path.abspath(os.path.join(dir_path, "../../"))
 
         self.cpp_file_path_to_generate = ""
 
