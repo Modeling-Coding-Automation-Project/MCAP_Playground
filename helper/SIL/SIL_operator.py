@@ -54,7 +54,10 @@ class CmakeGenerator:
 
     def _check_sample_dir_direct_under_root(self, python_file_dir: str) -> None:
         """
-
+        Check whether the 'sample' folder contained in the specified python_file_dir
+        is located directly under the workspace root (i.e., at root_path/sample).
+        The result is stored in self.sample_dir_direct_under_root.
+        If a sample folder exists at the root and may cause conflicts, a warning is printed.
         """
         self.sample_dir_direct_under_root = False
 
