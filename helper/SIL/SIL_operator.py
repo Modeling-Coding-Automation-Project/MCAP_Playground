@@ -54,7 +54,10 @@ class CmakeGenerator:
 
     def _check_sample_dir_direct_under_root(self, python_file_dir: str) -> None:
         """
-
+        Check whether the 'sample' folder contained in the specified python_file_dir
+        is located directly under the workspace root (i.e., at root_path/sample).
+        The result is stored in self.sample_dir_direct_under_root.
+        If a sample folder exists at the root and may cause conflicts, a warning is printed.
         """
         self.sample_dir_direct_under_root = False
 
@@ -179,6 +182,7 @@ class CmakeGenerator:
     @staticmethod
     def discover_source_files(
         root_path: str,
+        SIL_cpp_file_name: str,
         source_extensions: set = None
     ) -> list:
 
@@ -204,10 +208,27 @@ class CmakeGenerator:
                     rel = CmakeGenerator.check_path_is_sample(rel)
                     rel = CmakeGenerator.check_path_is_build(rel)
 
-                    if not (rel == "" and not is_root):
+                    is_target = CmakeGenerator.check_SIL_cpp_file_name(
+                        fn, SIL_cpp_file_name)
+
+                    if not (rel == "" and not is_root) and is_target:
                         source_file_list.append(os.path.join(dirpath, fn))
 
         return source_file_list
+
+    @staticmethod
+    def check_SIL_cpp_file_name(
+        file_name: str,
+        SIL_cpp_file_name: str
+    ) -> bool:
+        """
+        Return False when `file_name` ends with "_SIL.cpp" and is different
+        from `SIL_cpp_file_name`. Otherwise return True.
+        """
+        if file_name.endswith("_SIL.cpp") and file_name != SIL_cpp_file_name:
+            return False
+
+        return True
 
     def generate_cmake_lists_txt(self):
         """
@@ -216,7 +237,8 @@ class CmakeGenerator:
         include_dirs = CmakeGenerator.discover_source_include_dirs(
             self.root_path)
         source_file_list = CmakeGenerator.discover_source_files(
-            self.root_path)
+            root_path=self.root_path,
+            SIL_cpp_file_name=self.cpp_file_name)
 
         code_text = ""
         code_text += "cmake_minimum_required(VERSION 3.14)\n"
@@ -402,6 +424,8 @@ class SIL_Operator:
         target_python_file_name: str,
         SIL_folder: str
     ):
+        self.root_path = os.getcwd()
+
         if target_python_file_name.endswith(".py"):
             target_python_file_name = target_python_file_name[:-3]
         else:
@@ -418,8 +442,6 @@ class SIL_Operator:
 
         self.this_file_path = os.path.abspath(__file__)
         dir_path = os.path.dirname(self.this_file_path)
-
-        self.root_path = os.path.abspath(os.path.join(dir_path, "../../"))
 
         self.cpp_file_path_to_generate = ""
 
