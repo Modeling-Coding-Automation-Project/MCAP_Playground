@@ -50,35 +50,36 @@ class CmakeGenerator:
         self.python_file_dir = python_file_dir
 
         self.cpp_file_name = cpp_file_name
-        self._set_sample_dir_direct_under_root(python_file_dir)
+        self._check_sample_dir_direct_under_root(python_file_dir)
 
-    def _set_sample_dir_direct_under_root(self, python_file_dir: str) -> None:
+    def _check_sample_dir_direct_under_root(self, python_file_dir: str) -> None:
         """
-        Determine whether `python_file_dir` is within a `sample` directory
-        located directly under `root_path`, and set
-        `self.sample_dir_direct_under_root` accordingly.
+
         """
         self.sample_dir_direct_under_root = False
-        try:
-            path_split = python_file_dir.split('/')
-            sample_candidate = ""
-            for i in range(len(path_split)):
-                if path_split[i] == "sample":
-                    sample_candidate = '/'.join(path_split[:i + 1])
-                    break
 
-            if sample_candidate == "":
-                self.sample_dir_direct_under_root = False
-                return
+        path_split = python_file_dir.split('/')
+        sample_candidate = ""
+        for i in range(len(path_split)):
+            if path_split[i] == "sample":
+                sample_candidate = '/'.join(path_split[:i + 1])
+                break
 
-            root_sample = os.path.realpath(
-                os.path.join(self.root_path, "sample"))
-            self.sample_dir_direct_under_root = (
-                os.path.isdir(
-                    sample_candidate) and sample_candidate == root_sample
-            )
-        except Exception:
-            pass
+        if sample_candidate == "":
+            self.sample_dir_direct_under_root = False
+
+        root_sample = os.path.realpath(
+            os.path.join(self.root_path, "sample"))
+        self.sample_dir_direct_under_root = (
+            os.path.isdir(
+                sample_candidate) and sample_candidate == root_sample
+        )
+
+        if not self.sample_dir_direct_under_root:
+            if os.path.exists(root_sample):
+                warning_message = f"Warning: You should delete the 'sample' directory at root path {self.root_path}. " + \
+                    "Because the files in 'sample' directory may conflict with your SIL files."
+                print(warning_message)
 
     @staticmethod
     def check_path_is_sample(path: str) -> str:
