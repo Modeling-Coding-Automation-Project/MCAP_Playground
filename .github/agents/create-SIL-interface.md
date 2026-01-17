@@ -308,3 +308,5 @@ Add the SIL code after "C = sm.add(A, B)" as below:
 C_sil = SampleMatrixSIL.add(A, B)
 print("Matrix Addition, C++ SIL result:\n", C_sil)
 ```
+
+Do not edit "*.py" which defines the class itself. Only edit the Python file that uses the class.
