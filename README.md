@@ -22,6 +22,8 @@ C++11
   - https://note.com/claude_a/n/n57d7be4be39c
 - MPCライブラリの使い方
   - https://note.com/claude_a/n/nea53696d7aff
+- SIL機能の使い方
+  - https://note.com/claude_a/n/n153f7ab07208
 
 ## サポート
 
