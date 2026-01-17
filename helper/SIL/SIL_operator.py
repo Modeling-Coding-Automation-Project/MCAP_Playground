@@ -39,7 +39,8 @@ class CmakeGenerator:
         cpp_file_name: str,
         pybind11_module_name: str,
         SIL_folder: str,
-        root_path: str
+        root_path: str,
+        compile_definitions: list = None
     ):
         self.original_python_file_name = original_python_file_name
         self.pybind11_module_name = pybind11_module_name
@@ -51,6 +52,9 @@ class CmakeGenerator:
 
         self.cpp_file_name = cpp_file_name
         self._check_sample_dir_direct_under_root(python_file_dir)
+
+        # Optional list of compile-time definitions (e.g. ["__TEST__", "__DEBUG__"])
+        self.compile_definitions = compile_definitions or []
 
     def _check_sample_dir_direct_under_root(self, python_file_dir: str) -> None:
         """
@@ -252,8 +256,18 @@ class CmakeGenerator:
         code_text += "if(NOT CMAKE_BUILD_TYPE)\n"
         code_text += "  set(CMAKE_BUILD_TYPE Debug CACHE STRING \"Build type\" FORCE)\n"
         code_text += "endif()\n\n"
-        code_text += "set(CMAKE_CXX_FLAGS_DEBUG \"-g -O0\")\n"
-        code_text += "set(CMAKE_CXX_FLAGS_RELEASE \"-O2\")\n"
+        code_text += "set(CMAKE_CXX_FLAGS_DEBUG \"-g -O0 "
+
+        for definition in self.compile_definitions:
+            code_text += f"-D{definition} "
+        code_text += "\")\n"
+
+        code_text += "set(CMAKE_CXX_FLAGS_RELEASE \"-O2 "
+
+        for definition in self.compile_definitions:
+            code_text += f"-D{definition} "
+        code_text += "\")\n"
+
         code_text += "set(CMAKE_CXX_FLAGS_RELEASE \"${CMAKE_CXX_FLAGS_RELEASE} -flto=auto\")\n\n"
 
         code_text += "find_package(pybind11 REQUIRED)\n\n"
@@ -494,7 +508,7 @@ class SIL_Operator:
         subprocess.run(
             f"mv {build_folder}/{self.module_file_name}.*so {self.SIL_folder}", shell=True)
 
-    def build_SIL_code(self):
+    def build_SIL_code(self, compile_definitions=None):
         """
         Generate and build the SIL code for the given Python file.
         """
@@ -519,7 +533,8 @@ class SIL_Operator:
             self.cpp_file_path_to_generate.split('/')[-1],
             self.module_file_name,
             self.SIL_folder,
-            self.root_path)
+            self.root_path,
+            compile_definitions=compile_definitions)
         cmake_generator.generate_cmake_lists_txt()
 
         self.build_pybind11_code()
