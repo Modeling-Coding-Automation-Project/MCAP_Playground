@@ -488,29 +488,39 @@ class SIL_Operator:
         raise FileNotFoundError(
             f"CMakeLists.txt not found. Delete {self.cpp_file_path_to_generate} and try again.")
 
-    def build_pybind11_code(self):
+    def build_pybind11_code(self, build_type: str = "Debug"):
         """
         Build the pybind11 C++ code using CMake.
+
+        Args:
+            build_type: Build configuration, either "Debug" or "Release". Defaults to "Debug".
         """
+
+        if build_type not in ("Debug", "Release"):
+            raise ValueError(
+                f"build_type must be 'Debug' or 'Release', got '{build_type}'")
 
         build_folder = os.path.join(self.SIL_folder, "build")
 
         subprocess.run(f"rm -rf {build_folder}", shell=True)
         subprocess.run(f"mkdir -p {build_folder}", shell=True)
-        # Build in Debug by default so the generated module contains debug symbols
         subprocess.run(
-            f"cmake -S {self.SIL_folder} -B {build_folder} -DCMAKE_BUILD_TYPE=Debug",
+            f"cmake -S {self.SIL_folder} -B {build_folder} -DCMAKE_BUILD_TYPE={build_type}",
             shell=True
         )
         subprocess.run(
-            f"cmake --build {build_folder} --config Debug", shell=True)
+            f"cmake --build {build_folder} --config {build_type}", shell=True)
 
         subprocess.run(
             f"mv {build_folder}/{self.module_file_name}.*so {self.SIL_folder}", shell=True)
 
-    def build_SIL_code(self, compile_definitions=None):
+    def build_SIL_code(self, compile_definitions=None, build_type: str = "Debug"):
         """
         Generate and build the SIL code for the given Python file.
+
+        Args:
+            compile_definitions: Optional list of compile-time definitions (e.g. ["__TEST__"]).
+            build_type: Build configuration, either "Debug" or "Release". Defaults to "Debug".
         """
         python_file_name = self.target_python_file_name + ".py"
 
@@ -537,4 +547,4 @@ class SIL_Operator:
             compile_definitions=compile_definitions)
         cmake_generator.generate_cmake_lists_txt()
 
-        self.build_pybind11_code()
+        self.build_pybind11_code(build_type=build_type)

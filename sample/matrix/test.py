@@ -18,7 +18,7 @@ from helper.SIL.SIL_operator import SIL_Operator
 
 current_dir = os.path.dirname(__file__)
 generator = SIL_Operator("sample_matrix.py", current_dir)
-generator.build_SIL_code()
+generator.build_SIL_code(build_type="Debug")
 
 import SampleMatrixSIL
 SampleMatrixSIL.initialize()
