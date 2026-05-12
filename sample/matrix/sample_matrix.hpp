@@ -1,5 +1,5 @@
-#ifndef __SAMPLE_MATRIX_HPP__
-#define __SAMPLE_MATRIX_HPP__
+#ifndef SAMPLE_MATRIX_HPP_
+#define SAMPLE_MATRIX_HPP_
 
 #include "python_numpy.hpp"
 
@@ -25,4 +25,4 @@ private:
   DenseMatrix_Type _data;
 };
 
-#endif // __SAMPLE_MATRIX_HPP__
+#endif // SAMPLE_MATRIX_HPP_
