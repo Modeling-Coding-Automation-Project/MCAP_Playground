@@ -21,6 +21,8 @@ MyFuncSIL.initialize()
 import os
 import subprocess
 import ast
+import json
+import fnmatch
 
 
 def snake_to_camel(snake_str: str) -> str:
@@ -32,6 +34,8 @@ def snake_to_camel(snake_str: str) -> str:
 
 
 class CmakeGenerator:
+    EXCLUDE_PATHS_FILE_NAME = "SIL_operator_exclude_paths.json"
+
     def __init__(
         self,
         original_python_file_name: str,
@@ -49,6 +53,7 @@ class CmakeGenerator:
 
         self.root_path = root_path
         self.python_file_dir = python_file_dir
+        self.exclude_path_patterns = self.load_exclude_path_patterns()
 
         self.cpp_file_name = cpp_file_name
         self._check_sample_dir_direct_under_root(python_file_dir)
@@ -89,31 +94,80 @@ class CmakeGenerator:
                 print(warning_message)
 
     @staticmethod
-    def check_path_is_sample(path: str) -> str:
+    def load_exclude_path_patterns() -> list:
         """
-        Check if the given path is under "external_libraries" and contains
-        "sample", "test_sil", or "test_vs" folders. If so, return an empty string.
+        Load exclude path patterns from SIL_operator_exclude_paths.json.
+
+        The config file is expected to be located in the same directory as this file.
+        Supported formats:
+            - {"exclude_paths": ["pattern1", "pattern2", ...]}
+            - ["pattern1", "pattern2", ...]
+        """
+        current_dir = os.path.dirname(os.path.abspath(__file__))
+        config_path = os.path.join(
+            current_dir, CmakeGenerator.EXCLUDE_PATHS_FILE_NAME)
+
+        if not os.path.exists(config_path):
+            raise FileNotFoundError(
+                f"Exclude path config not found: {config_path}")
+
+        with open(config_path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+
+        if isinstance(data, dict):
+            patterns = data.get("exclude_paths", [])
+        elif isinstance(data, list):
+            patterns = data
+        else:
+            raise ValueError(
+                f"Invalid format in exclude path config: {config_path}")
+
+        if not isinstance(patterns, list):
+            raise ValueError(
+                f"'exclude_paths' must be a list in: {config_path}")
+
+        return [str(p).replace('\\', '/').strip('/') for p in patterns if str(p).strip()]
+
+    @staticmethod
+    def check_path_is_excluded(path: str, exclude_path_patterns: list) -> str:
+        """
+        Check if the given path matches one of exclude_path_patterns.
+        If matched, return an empty string.
         Otherwise, return the original path.
         """
+        normalized = path.replace('\\', '/').strip('/')
 
-        path_folders = path.split('/')
-        external_libraries_flag = False
-        helper_file_flag = False
-
-        for i, folder in enumerate(path_folders):
-            if folder.lower() == "external_libraries":
-                external_libraries_flag = True
-
-            if (external_libraries_flag) and \
-                ((folder.lower() == "sample") or
-                 (folder.lower() == "test_sil") or
-                    (folder.lower() == "test_vs")):
-                helper_file_flag = True
-
-        if external_libraries_flag and helper_file_flag:
-            return ""
-        else:
+        if normalized == "":
             return path
+
+        for pattern in exclude_path_patterns:
+            normalized_pattern = pattern.replace('\\', '/').strip('/')
+
+            # Wildcard pattern match.
+            if fnmatch.fnmatch(normalized, normalized_pattern):
+                return ""
+
+            # Directory-prefix match when pattern has no wildcard.
+            if not any(ch in normalized_pattern for ch in "*?[]"):
+                if normalized == normalized_pattern or normalized.startswith(normalized_pattern + "/"):
+                    return ""
+
+        return path
+
+    @staticmethod
+    def check_path_is_sample(path: str) -> str:
+        """
+        Backward-compatible wrapper for legacy call sites.
+        """
+        legacy_patterns = [
+            "external_libraries/*/sample",
+            "external_libraries/*/sample/*",
+            "external_libraries/*/test_sil",
+            "external_libraries/*/test_sil/*",
+            "external_libraries/*/test_vs",
+            "external_libraries/*/test_vs/*"
+        ]
+        return CmakeGenerator.check_path_is_excluded(path, legacy_patterns)
 
     @staticmethod
     def check_path_is_build(path: str) -> str:
@@ -140,6 +194,7 @@ class CmakeGenerator:
     @staticmethod
     def discover_source_include_dirs(
         root_path: str,
+        exclude_path_patterns: list,
         source_header_extensions: set = None
     ) -> list:
         """
@@ -173,8 +228,8 @@ class CmakeGenerator:
                     if rel == '.':
                         rel = ''
 
-                    rel = CmakeGenerator.check_path_is_sample(rel)
-                    rel = CmakeGenerator.check_path_is_build(rel)
+                    rel = CmakeGenerator.check_path_is_excluded(
+                        rel, exclude_path_patterns)
 
                     if (rel not in seen) and (rel != ""):
                         seen.add(rel)
@@ -187,6 +242,7 @@ class CmakeGenerator:
     def discover_source_files(
         root_path: str,
         SIL_cpp_file_name: str,
+        exclude_path_patterns: list,
         source_extensions: set = None
     ) -> list:
 
@@ -209,8 +265,8 @@ class CmakeGenerator:
                     is_root = (original_rel == '.')
                     rel = '' if is_root else original_rel
 
-                    rel = CmakeGenerator.check_path_is_sample(rel)
-                    rel = CmakeGenerator.check_path_is_build(rel)
+                    rel = CmakeGenerator.check_path_is_excluded(
+                        rel, exclude_path_patterns)
 
                     is_target = CmakeGenerator.check_SIL_cpp_file_name(
                         fn, SIL_cpp_file_name)
@@ -239,10 +295,12 @@ class CmakeGenerator:
         Generate a CMakeLists.txt file for building the pybind11 module.
         """
         include_dirs = CmakeGenerator.discover_source_include_dirs(
-            self.root_path)
+            root_path=self.root_path,
+            exclude_path_patterns=self.exclude_path_patterns)
         source_file_list = CmakeGenerator.discover_source_files(
             root_path=self.root_path,
-            SIL_cpp_file_name=self.cpp_file_name)
+            SIL_cpp_file_name=self.cpp_file_name,
+            exclude_path_patterns=self.exclude_path_patterns)
 
         code_text = ""
         code_text += "cmake_minimum_required(VERSION 3.14)\n"
