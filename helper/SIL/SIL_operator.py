@@ -56,42 +56,9 @@ class CmakeGenerator:
         self.exclude_path_patterns = self.load_exclude_path_patterns()
 
         self.cpp_file_name = cpp_file_name
-        self._check_sample_dir_direct_under_root(python_file_dir)
 
         # Optional list of compile-time definitions (e.g. ["__TEST__", "__DEBUG__"])
         self.compile_definitions = compile_definitions or []
-
-    def _check_sample_dir_direct_under_root(self, python_file_dir: str) -> None:
-        """
-        Check whether the 'sample' folder contained in the specified python_file_dir
-        is located directly under the workspace root (i.e., at root_path/sample).
-        The result is stored in self.sample_dir_direct_under_root.
-        If a sample folder exists at the root and may cause conflicts, a warning is printed.
-        """
-        self.sample_dir_direct_under_root = False
-
-        path_split = python_file_dir.split('/')
-        sample_candidate = ""
-        for i in range(len(path_split)):
-            if path_split[i] == "sample":
-                sample_candidate = '/'.join(path_split[:i + 1])
-                break
-
-        if sample_candidate == "":
-            self.sample_dir_direct_under_root = False
-
-        root_sample = os.path.realpath(
-            os.path.join(self.root_path, "sample"))
-        self.sample_dir_direct_under_root = (
-            os.path.isdir(
-                sample_candidate) and sample_candidate == root_sample
-        )
-
-        if not self.sample_dir_direct_under_root:
-            if os.path.exists(root_sample):
-                warning_message = f"Warning: You should delete the 'sample' directory at root path {self.root_path}. " + \
-                    "Because the files in 'sample' directory may conflict with your SIL files."
-                print(warning_message)
 
     @staticmethod
     def load_exclude_path_patterns() -> list:
@@ -153,43 +120,6 @@ class CmakeGenerator:
                     return ""
 
         return path
-
-    @staticmethod
-    def check_path_is_sample(path: str) -> str:
-        """
-        Backward-compatible wrapper for legacy call sites.
-        """
-        legacy_patterns = [
-            "external_libraries/*/sample",
-            "external_libraries/*/sample/*",
-            "external_libraries/*/test_sil",
-            "external_libraries/*/test_sil/*",
-            "external_libraries/*/test_vs",
-            "external_libraries/*/test_vs/*"
-        ]
-        return CmakeGenerator.check_path_is_excluded(path, legacy_patterns)
-
-    @staticmethod
-    def check_path_is_build(path: str) -> str:
-        """
-        Check if the given path is under "build". If so, return an empty string.
-        Otherwise, return the original path.
-        """
-
-        path_folders = path.split('/')
-
-        for i, folder in enumerate(path_folders):
-            if folder.lower() == "build":
-                return ""
-
-        return path
-
-    def is_sample_dir_direct_under_root(self) -> bool:
-        """
-        Return True if `python_file_dir` contains a `sample` subdirectory and that
-        `sample` directory is located directly under `root_path` (i.e. root_path/sample).
-        """
-        return getattr(self, "sample_dir_direct_under_root", False)
 
     @staticmethod
     def discover_source_include_dirs(
