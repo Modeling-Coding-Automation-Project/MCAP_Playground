@@ -1,0 +1,14 @@
+{
+  "exclude_paths": [
+    "external_libraries/*/sample",
+    "external_libraries/*/sample/*",
+    "external_libraries/*/test_sil",
+    "external_libraries/*/test_sil/*",
+    "external_libraries/*/test_vs",
+    "external_libraries/*/test_vs/*",
+    "build",
+    "build/*",
+    "*/build",
+    "*/build/*"
+  ]
+}
